@@ -1,10 +1,21 @@
 {
   "devDependencies": {
+    "@types/ioredis": "^4.28.10",
     "@types/node": "^22.13.10",
+    "rimraf": "^6.0.1",
     "typescript": "^5.8.2"
   },
   "dependencies": {
+    "@grammyjs/storage-free": "^2.5.0",
+    "@grammyjs/storage-redis": "^2.5.1",
+    "axios": "^1.8.4",
     "dotenv": "^16.4.7",
-    "grammy": "^1.35.0"
+    "grammy": "^1.35.0",
+    "ioredis": "^5.6.0"
+  },
+  "scripts": {
+    "clean": "rimraf dist && rimraf .tsbuildinfo && rimraf *.js",
+    "build": "tsc",
+    "start": "node dist/bot.js"
   }
 }
