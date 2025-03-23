@@ -1,5 +1,6 @@
 import { Bot,session, InlineKeyboard, MemorySessionStorage } from "grammy";
-import {freeStorage} from "@grammyjs/storage-free";
+import {RedisAdapter} from "@grammyjs/storage-redis";
+import IORedis from "ioredis";
 import dotenv from "dotenv";
 import { MyContext, SessionData } from "./types";
 import auth from "./commands/auth";
@@ -11,7 +12,8 @@ the auth api over here
 
 dotenv.config();
 //Create instance of bot class and pass bot token via env var
-
+const redisInstance = new IORedis('redis://localhost:6379');
+const storage = new RedisAdapter({ instance: redisInstance,autoParseDates: true});
 const bot = new Bot<MyContext>(process.env.BOT_TOKEN!);
 console.log("DEBUG BOT_TOKEN:", process.env.BOT_TOKEN);
 if (!process.env.BOT_TOKEN) throw new Error("No BOT_TOKEN! Check your .env or environment.");
@@ -27,7 +29,7 @@ bot.use(session({
     }),
     //Whats session data over here representing
         
-    storage: new MemorySessionStorage(),
+    storage,
 
 }));
 
