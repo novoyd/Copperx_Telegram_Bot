@@ -11,7 +11,7 @@ import {
 } from "../services/copperxApi";
 
 /**
- * CHANGE: getNetworkName now includes chainId=1 => Ethereum, etc.
+ *  getNetworkName now includes chainId=1 => Ethereum, etc.
  * We expanded the switch to cover more networks if needed.
  */
 function getNetworkName(chainId: string | number): string {
@@ -69,7 +69,7 @@ wallet.command("kyc", async (ctx) => {
 
 /* --------------------------------------------------------------------------
    /profile: shows the user’s profile from /api/auth/me
-   CHANGE: Just clarified the formatting, no major structural change
+    Just changed the formatting 
 */
 wallet.command("profile", async (ctx) => {
   if (!ctx.session.isAuthenticated || !ctx.session.token) {
@@ -96,7 +96,7 @@ wallet.command("profile", async (ctx) => {
 
 /* --------------------------------------------------------------------------
    /mywallets and inline callback "wallets"
-   CHANGE: We consolidated the logic into showWallets(ctx) to avoid duplication.
+    We consolidated the logic into showWallets(ctx) to avoid duplication.
            We call getNetworkName for the chain ID.
 */
 wallet.command("mywallets", async (ctx) => {
@@ -122,9 +122,9 @@ async function showWallets(ctx: MyContext) {
     wallets.forEach((w: any, idx: number) => {
       text += `\n*${idx + 1}.* Wallet ID: \`${w.id}\`\n` +
               `   Address: \`${w.walletAddress}\`\n` +
-              // CHANGE: Using getNetworkName for a friendlier label:
+              //  Using getNetworkName for a friendlier label:
               `   Network: \`${getNetworkName(w.network)}\`\n`;
-              // CHANGE: only show "Default Wallet" if w.isDefault == true
+              //  only show "Default Wallet" if w.isDefault == true
                 if (w.isDefault) {
                     text += `   Default: *YES*\n`; // or "Default Wallet"
                 } 
@@ -138,7 +138,7 @@ async function showWallets(ctx: MyContext) {
 
 /** 
  * If user taps "My Wallets" button in the main menu => callback "wallets"
- * CHANGE: We call showWallets with the same logic as /mywallets
+ *  We call showWallets with the same logic as /mywallets
  */
 wallet.callbackQuery("wallets", async (ctx) => {
   await ctx.answerCallbackQuery();
@@ -151,7 +151,7 @@ wallet.callbackQuery("wallets", async (ctx) => {
 
 /* --------------------------------------------------------------------------
    /balance or inline callback "balance"
-   CHANGE: Similar approach with showBalances(ctx)
+    Similar approach with showBalances(ctx)
 */
 wallet.command("balance", async (ctx) => {
   if (!ctx.session.isAuthenticated || !ctx.session.token) {
@@ -196,7 +196,7 @@ wallet.callbackQuery("balance", async (ctx) => {
 /**
  * inline callback "transfer" was here as a stub. 
  * We leave a short note or route it to transfer.ts. 
- * CHANGE: We mention "↗️ Transfer is handled in transfer.ts" or something similar.
+ * We mention "↗️ Transfer is handled in transfer.ts" or something similar.
  */
 wallet.callbackQuery("transfer", async (ctx) => {
   await ctx.answerCallbackQuery();
@@ -204,12 +204,12 @@ wallet.callbackQuery("transfer", async (ctx) => {
     await ctx.reply("❌ Please log in to initiate transfers.");
     return;
   }
-  await ctx.reply("↗️ Transfer functionality is implemented in transfer.ts (Use slash commands or the /transfer menu).");
+  await ctx.reply("↗️ Transfer functionality is implemented in helper menu(Use slash commands or the /transfer menu).");
 });
 
 /* --------------------------------------------------------------------------
    /setwallet <walletId>
-   CHANGE: We do a quick usage check, call setDefaultWallet, and confirm.
+    We do a quick usage check, call setDefaultWallet, and confirm.
 */
 wallet.command("setwallet", async (ctx) => {
   if (!ctx.session.isAuthenticated || !ctx.session.token) {
@@ -238,7 +238,7 @@ wallet.command("setwallet", async (ctx) => {
 
 /**
  * /getdefault (optional): fetch /api/wallets/default
- * CHANGE: We left it for completeness, or user can see which is default.
+ * We left it for completeness, or user can see which is default.
  */
 wallet.command("getdefault", async (ctx) => {
   if (!ctx.session.isAuthenticated || !ctx.session.token) {

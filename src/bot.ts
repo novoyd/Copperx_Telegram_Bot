@@ -15,12 +15,13 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("No BOT_TOKEN! Check your .env or environment.");
 
 //  We connect to redis and create a storage for session
-const redis = new IORedis("redis://localhost:6379");
+const redisUrl = process.env.REDIS_URL;
+const redis = new IORedis(redisUrl!);
 const storage = new RedisAdapter({ instance: redis, autoParseDates: true });
 
 const bot = new Bot<MyContext>(BOT_TOKEN);
 
-// CHANGE: We persist session in Redis with an initial shape
+//  We persist session in Redis with an initial shape
 bot.use(session({
   initial: (): SessionData => ({
     token: undefined,
@@ -39,7 +40,7 @@ bot.use(transfer);
 
 /**
  * /start command:
- * CHANGE: We added "🪙 Deposit" to the main menu for an authenticated user.
+ * We added "🪙 Deposit" to the main menu for an authenticated user.
  */
 bot.command("start", async (ctx) => {
   if (ctx.session.isAuthenticated) {
@@ -62,7 +63,7 @@ bot.command("start", async (ctx) => {
 
 /**
  * /help command:
- * CHANGE: We mention /deposit along with the other commands if user is logged in.
+ * We mention /deposit along with the other commands if user is logged in.
  */
 bot.command("help", async (ctx) => {
   if (!ctx.session.isAuthenticated) {
