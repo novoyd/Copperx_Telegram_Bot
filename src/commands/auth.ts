@@ -1,3 +1,5 @@
+// src/commands/auth.ts
+
 import { Composer, InlineKeyboard } from "grammy";
 import { MyContext } from "../types";
 import {
@@ -5,11 +7,15 @@ import {
   verifyEmailOtp,
   getUserProfile,
 } from "../services/copperxApi";
-//Composer is a middleware that allows you to handle different types of updates
+
+//  This composer handles /login, /logout, inline "login"/"logout" callbacks,
+// and the multi-step email+OTP flow. 
+
 const auth = new Composer<MyContext>();
 
-/** 
- * /login command or "Log In" inline button: initiates the OTP login flow.
+/**
+ * /login command or "Log In" inline button initiates the OTP login flow.
+ *  We ensure no existing operation is in progress and the user isn't already logged in.
  */
 auth.command("login", async (ctx) => {
   if (ctx.session.awaiting !== "none") {
@@ -24,6 +30,9 @@ auth.command("login", async (ctx) => {
   await ctx.reply("🔑 Please enter your email address to log in:");
 });
 
+/** 
+ *  Inline version of the same logic for "Log In" callback.
+ */
 auth.callbackQuery("login", async (ctx) => {
   await ctx.answerCallbackQuery();
   if (ctx.session.awaiting !== "none") {
@@ -39,7 +48,8 @@ auth.callbackQuery("login", async (ctx) => {
 });
 
 /** 
- * /cancel command to abort any ongoing operation (e.g., in the middle of login).
+ * /cancel command aborts any in-progress operation (like waiting for email or OTP).
+ * We reset session.awaiting to 'none' so user can start fresh.
  */
 auth.command("cancel", async (ctx) => {
   if (ctx.session.awaiting !== "none") {
@@ -52,8 +62,9 @@ auth.command("cancel", async (ctx) => {
   }
 });
 
-/** 
- * /logout command to log the user out, or "Logout" inline button.
+/**
+ * /logout or "Logout" inline button: clear session data and show a "Log In" button.
+ *  We reset all session fields and prompt with inline "Log In."
  */
 auth.command("logout", async (ctx) => {
   if (!ctx.session.isAuthenticated) {
@@ -61,7 +72,6 @@ auth.command("logout", async (ctx) => {
     return;
   }
   const prevEmail = ctx.session.email;
-  // Clear session
   ctx.session.isAuthenticated = false;
   ctx.session.email = undefined;
   ctx.session.sid = undefined;
@@ -73,6 +83,9 @@ auth.command("logout", async (ctx) => {
   });
 });
 
+/**
+ *  Inline "logout" callback is mirrored, resetting session and showing "Log In."
+ */
 auth.callbackQuery("logout", async (ctx) => {
   await ctx.answerCallbackQuery();
   if (!ctx.session.isAuthenticated) {
@@ -80,7 +93,6 @@ auth.callbackQuery("logout", async (ctx) => {
     return;
   }
   const prevEmail = ctx.session.email;
-  // Clear session
   ctx.session.isAuthenticated = false;
   ctx.session.email = undefined;
   ctx.session.sid = undefined;
@@ -92,85 +104,86 @@ auth.callbackQuery("logout", async (ctx) => {
   });
 });
 
-/** 
- * Text message handler for actual login flow (email -> request OTP, OTP -> verify).
+/**
+ * Text message handler: 
+ *  Step 1 (email), Step 2 (OTP). 
+ *  If an error occurs, we log it and show the user a friendly message.
+ *  After success, we add the "🪙 Deposit" button to the main menu.
  */
 auth.on("message:text", async (ctx, next) => {
-  try {// Step 1: user provides email
-  if (ctx.session.awaiting === "email") {
-    const email = ctx.message.text.trim();
-    try {
-      // requestEmailOtp now returns { email, sid }
-      const { email: returnedEmail, sid } = await requestEmailOtp(email);
-      ctx.session.email = returnedEmail;
-      ctx.session.sid = sid;
-      ctx.session.awaiting = "otp";
+  try {
+    // STEP 1: user provides email
+    if (ctx.session.awaiting === "email") {
+      const email = ctx.message.text.trim();
+      try {
+        const { email: returnedEmail, sid } = await requestEmailOtp(email);
+        ctx.session.email = returnedEmail;
+        ctx.session.sid = sid;
+        ctx.session.awaiting = "otp";
 
-      await ctx.reply("✅ An OTP has been sent to your email. Please enter the one-time password:");
-    } catch (err: any) {
-      console.error("OTP request error:", err);
-      const errMsg = err.message || "Failed to send OTP. Please check the email and try again.";
-      await ctx.reply(`❌ ${errMsg}`);
-      ctx.session.awaiting = "none";
-    }
-    return;
-  }
-
-  // Step 2: user provides OTP
-  if (ctx.session.awaiting === "otp") {
-    const otp = ctx.message.text.trim();
-    if (!ctx.session.email || !ctx.session.sid) {
-      await ctx.reply("❌ Something went wrong. Please /cancel and try again.");
-      ctx.session.awaiting = "none";
+        await ctx.reply("✅ An OTP has been sent to your email. Please enter the one-time password:");
+      } catch (err: any) {
+        console.error("OTP request error:", err);
+        const errMsg = err.message || "Failed to send OTP. Please check the email and try again.";
+        await ctx.reply(`❌ ${errMsg}`);
+        ctx.session.awaiting = "none";
+      }
       return;
     }
-    try {
-      // verifyEmailOtp now requires (email, otp, sid) to get the token and user data
-      const authData = await verifyEmailOtp(ctx.session.email, otp, ctx.session.sid);
 
-      // Grab the token from authData
-      const token = authData.accessToken; // see docs: "accessToken"
-      ctx.session.token = token;
-      ctx.session.isAuthenticated = true;
-      ctx.session.awaiting = "none";
-      ctx.session.sid = undefined; // sid not needed after successful verification
-
-      // (Optional) Fetch user profile
-      let displayName: string = ctx.session.email;
-      try {
-        const profile = await getUserProfile(token);
-        if (profile.firstName || profile.lastName) {
-          displayName = `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
-        }
-      } catch (profileError) {
-        console.warn("Unable to fetch profile after login:", profileError);
+    // STEP 2: user provides OTP
+    if (ctx.session.awaiting === "otp") {
+      const otp = ctx.message.text.trim();
+      if (!ctx.session.email || !ctx.session.sid) {
+        await ctx.reply("❌ Something went wrong. Please /cancel and try again.");
+        ctx.session.awaiting = "none";
+        return;
       }
+      try {
+        const authData = await verifyEmailOtp(ctx.session.email, otp, ctx.session.sid);
 
-      // Present main menu
-      const menuKeyboard = new InlineKeyboard()
-        .text("💼 My Wallets", "wallets").text("💰 Balance", "balance").row()
-        .text("↗️ Transfer", "transfer").text("🔓 Logout", "logout");
+        ctx.session.token = authData.accessToken;
+        ctx.session.isAuthenticated = true;
+        ctx.session.awaiting = "none";
+        ctx.session.sid = undefined;
 
-      await ctx.reply(
-        `✅ Login successful! You are now logged in as ${displayName}. What would you like to do next?`,
-        { reply_markup: menuKeyboard }
-      );
-    } catch (err: any) {
-      console.error("OTP verification error:", err);
-      const errMsg = err.message || "Authentication failed. Please ensure the OTP is correct.";
-      await ctx.reply(`❌ ${errMsg}`);
-      await ctx.reply("⌛ Please enter the correct OTP, or send /cancel to abort and start over.");
+        // OPTIONAL: fetch user profile for a display name
+        let displayName: string = ctx.session.email;
+        try {
+          const profile = await getUserProfile(ctx.session.token!);
+          if (profile.firstName || profile.lastName) {
+            displayName = `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
+          }
+        } catch (profileError) {
+          console.warn("Unable to fetch profile after login:", profileError);
+        }
+
+        // CHANGE: new "🪙 Deposit" button added to menuKeyboard
+        const menuKeyboard = new InlineKeyboard()
+          .text("💼 My Wallets", "wallets").text("💰 Balance", "balance").row()
+          .text("↗️ Transfer", "transfer").text("🪙 Deposit", "deposit").row()
+          .text("🔓 Logout", "logout");
+
+        await ctx.reply(
+          `✅ Login successful! You are now logged in as ${displayName}.`,
+          { reply_markup: menuKeyboard }
+        );
+      } catch (err: any) {
+        console.error("OTP verification error:", err);
+        const errMsg = err.message || "Authentication failed. Please ensure the OTP is correct.";
+        await ctx.reply(`❌ ${errMsg}`);
+        await ctx.reply("⌛ Please enter the correct OTP, or send /cancel to abort and start over.");
+      }
+      return;
     }
-    return;
-  }
 
-  // If we're not in email/otp flow, pass to next handlers
-  await next();
+    // fallback if not in 'email'/'otp' flow
+    await next();
 
-} catch (err: any) {
+  } catch (err: any) {
     console.error("Unexpected auth flow error:", err);
     await ctx.reply("❌ An unexpected error occurred in the auth flow. Please try again.");
-    }
+  }
 });
 
 export default auth;
